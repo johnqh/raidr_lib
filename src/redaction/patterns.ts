@@ -16,7 +16,10 @@ const KEY_KINDS: Array<[RegExp, RedactionKind]> = [
   [/^(client_?secret|secret)$/i, 'api-key'],
   [/^(cookie|set-cookie)$/i, 'cookie'],
   [/^(authorization|proxy-authorization)$/i, 'bearer'],
-  [/(^|[-_])session([-_]|$)/i, 'api-key'],
+  // Its own kind, not 'api-key': a session token authenticates a person, and
+  // filing it under the label for keys made a capture look full of leaked API
+  // keys when it held none.
+  [/(^|[-_])session([-_]|$)/i, 'session'],
   [/^(ssn|social_?security)$/i, 'password'],
   [/^(credit_?card|card_?number|cvv|cvc)$/i, 'password'],
   [/^(email|email_?address)$/i, 'email'],

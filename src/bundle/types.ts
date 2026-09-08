@@ -11,6 +11,8 @@ export type RedactionKind =
   | 'bearer'
   | 'cookie'
   | 'api-key'
+  /** A per-user credential issued by the server, not build-time config. */
+  | 'session'
   | 'password'
   | 'email'
   | 'phone'

@@ -9,7 +9,7 @@ test('recognises sensitive key names', () => {
   expect(isSensitiveKey('client_secret')).toBe('api-key');
   expect(isSensitiveKey('secret')).toBe('api-key');
   // A session token is issued per user, not baked into the build.
-  expect(isSensitiveKey('X-Session-Id')).toBe('api-key');
+  expect(isSensitiveKey('X-Session-Id')).toBe('session');
 });
 
 /**
@@ -57,7 +57,7 @@ test('still redacts a value whose key names it as sensitive', () => {
     { 'x-session-token': 'a'.repeat(40), etag: 'b'.repeat(40) },
     pseudonym
   );
-  expect(out['x-session-token']).toMatch(/^<API_KEY:[0-9a-f]{4}>$/);
+  expect(out['x-session-token']).toMatch(/^<SESSION:[0-9a-f]{4}>$/);
   // An ETag is not a credential under any key name.
   expect(out.etag).toBe('b'.repeat(40));
 });
@@ -99,4 +99,26 @@ test('matches header names case-insensitively', () => {
   const { pseudonym } = createPseudonymizer('s');
   const out = redactHeaders({ Authorization: 'Bearer abcdef123456' }, pseudonym);
   expect(out.Authorization).toMatch(/^<BEARER:/);
+});
+
+/**
+ * A session token authenticates a person, so it stays redacted — but it is not
+ * an API key, and reporting it as one made a capture look full of leaked keys
+ * when it held none.
+ */
+test('reports a session credential under its own kind', () => {
+  expect(isSensitiveKey('session')).toBe('session');
+  expect(isSensitiveKey('reddit_session')).toBe('session');
+  expect(isSensitiveKey('x-session-id')).toBe('session');
+  expect(isSensitiveKey('session_tracker')).toBe('session');
+});
+
+test('a session value gets a session placeholder', () => {
+  const { pseudonym } = createPseudonymizer('s');
+  const out = redactHeaders({ 'reddit_session': 'abc123def456' }, pseudonym);
+  expect(out['reddit_session']).toMatch(/^<SESSION:[0-9a-f]{4}>$/);
+});
+
+test('a genuine client secret is still an api-key', () => {
+  expect(isSensitiveKey('client_secret')).toBe('api-key');
 });

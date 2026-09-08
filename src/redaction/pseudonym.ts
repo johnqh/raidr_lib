@@ -7,6 +7,7 @@ const LABELS: Record<RedactionKind, string> = {
   bearer: 'BEARER',
   cookie: 'COOKIE',
   'api-key': 'API_KEY',
+  session: 'SESSION',
   password: 'PASSWORD',
   email: 'EMAIL',
   phone: 'PHONE',
