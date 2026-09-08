@@ -6,9 +6,21 @@ import { isSensitiveKey, classifyValue } from '../../src/redaction/patterns';
 test('recognises sensitive key names', () => {
   expect(isSensitiveKey('password')).toBe('password');
   expect(isSensitiveKey('access_token')).toBe('jwt');
-  expect(isSensitiveKey('apiKey')).toBe('api-key');
-  expect(isSensitiveKey('api_key')).toBe('api-key');
+  expect(isSensitiveKey('client_secret')).toBe('api-key');
+  expect(isSensitiveKey('secret')).toBe('api-key');
+  // A session token is issued per user, not baked into the build.
   expect(isSensitiveKey('X-Session-Id')).toBe('api-key');
+});
+
+/**
+ * A key the browser ships is public by construction — anyone can read it out
+ * of the bundle. Redacting it protects nothing and leaves the reconstructed
+ * app unable to reach its own backend.
+ */
+test('leaves publishable frontend api keys alone', () => {
+  expect(isSensitiveKey('apiKey')).toBeNull();
+  expect(isSensitiveKey('api_key')).toBeNull();
+  expect(isSensitiveKey('x-api-key')).toBeNull();
 });
 
 test('leaves ordinary key names alone', () => {
@@ -21,7 +33,33 @@ test('classifies values by shape', () => {
   expect(classifyValue('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc')).toBe('jwt');
   expect(classifyValue('Bearer abc123def456')).toBe('bearer');
   expect(classifyValue('jane@corp.com')).toBe('email');
-  expect(classifyValue('a'.repeat(40))).toBe('high-entropy');
+});
+
+/**
+ * Length and alphabet are not evidence of a secret. Every content hash, trace
+ * id, nonce, signature and public key has exactly this shape, and treating the
+ * shape alone as sensitive replaced them all with placeholders the rebuilt app
+ * cannot use.
+ */
+test('does not treat a long base64-ish value as a secret on shape alone', () => {
+  expect(classifyValue('a'.repeat(40))).toBeNull();
+  // A sha256 content hash.
+  expect(
+    classifyValue('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+  ).toBeNull();
+  // A Firebase web api key, which ships in the bundle.
+  expect(classifyValue('publishable-frontend-key-0123456789abcdefghij')).toBeNull();
+});
+
+test('still redacts a value whose key names it as sensitive', () => {
+  const { pseudonym } = createPseudonymizer('s');
+  const out = redactHeaders(
+    { 'x-session-token': 'a'.repeat(40), etag: 'b'.repeat(40) },
+    pseudonym
+  );
+  expect(out['x-session-token']).toMatch(/^<API_KEY:[0-9a-f]{4}>$/);
+  // An ETag is not a credential under any key name.
+  expect(out.etag).toBe('b'.repeat(40));
 });
 
 test('preserves UUIDs — they are structural, not secret', () => {

@@ -5,12 +5,15 @@ const UUID_RE =
 const JWT_RE = /^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/;
 const BEARER_RE = /^Bearer\s+\S{8,}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const HIGH_ENTROPY_RE = /^[A-Za-z0-9+/_=-]{40,}$/;
 
 const KEY_KINDS: Array<[RegExp, RedactionKind]> = [
   [/^(password|passwd|pwd)$/i, 'password'],
   [/^(access_?token|refresh_?token|id_?token|jwt)$/i, 'jwt'],
-  [/^(api_?key|apikey|x-api-key|client_?secret|secret)$/i, 'api-key'],
+  // Deliberately excludes api_key / apikey / x-api-key. A key the browser
+  // ships is public by construction: anyone can read it out of the bundle, so
+  // redacting it protects nothing and leaves the reconstructed app unable to
+  // reach its own backend. A client secret is never legitimately public.
+  [/^(client_?secret|secret)$/i, 'api-key'],
   [/^(cookie|set-cookie)$/i, 'cookie'],
   [/^(authorization|proxy-authorization)$/i, 'bearer'],
   [/(^|[-_])session([-_]|$)/i, 'api-key'],
@@ -28,12 +31,17 @@ export function isSensitiveKey(key: string): RedactionKind | null {
 }
 
 export function classifyValue(value: string): RedactionKind | null {
-  // UUIDs first: they look high-entropy but carry the relational shape of the
-  // data. Redacting them would break foreign-key correspondence downstream.
+  // UUIDs first. Nothing below matches one today, but the guard states the
+  // invariant that keeps a future shape rule from breaking foreign-key
+  // correspondence: an id is structural, not secret.
   if (UUID_RE.test(value)) return null;
   if (JWT_RE.test(value)) return 'jwt';
   if (BEARER_RE.test(value)) return 'bearer';
   if (EMAIL_RE.test(value)) return 'email';
-  if (HIGH_ENTROPY_RE.test(value)) return 'high-entropy';
+  // Nothing is inferred from length and alphabet alone. A long base64-ish
+  // string is equally the shape of a content hash, a trace id, a nonce, a
+  // signature and a public key; treating the shape as sensitive replaced all
+  // of them with placeholders the rebuilt app cannot use. A credential is
+  // recognised by its own syntax (JWT, Bearer) or by the key that carries it.
   return null;
 }
