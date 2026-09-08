@@ -19,12 +19,18 @@ function apiPrefixes(model: ApiModel): string[] {
 }
 
 export function generateReplayServer(model: ApiModel): string {
-  const routes = model.endpoints
-    .map(
-      (endpoint) =>
-        `app.${endpoint.method.toLowerCase()}('${templateToHonoPath(endpoint.template)}', (c) => respond(c, '${endpoint.key}'));`
-    )
-    .join('\n');
+  const route = (endpoint: ApiModel['endpoints'][number]) =>
+    `app.${endpoint.method.toLowerCase()}('${templateToHonoPath(endpoint.template)}', (c) => respond(c, '${endpoint.key}'));`;
+
+  // An exact path is unambiguous, so it can replay ahead of the static handler.
+  // A path with a param is a pattern, and a pattern matches real files too:
+  // `/{token}` becomes `/:token`, which swallows /favicon.ico and every other
+  // top-level file in the mirror. Those wait until static has had its turn.
+  const isPattern = (endpoint: ApiModel['endpoints'][number]) =>
+    endpoint.template.includes('{');
+
+  const literalRoutes = model.endpoints.filter((e) => !isPattern(e)).map(route).join('\n');
+  const patternRoutes = model.endpoints.filter(isPattern).map(route).join('\n');
 
   const gapGuards = apiPrefixes(model)
     .map(
@@ -57,11 +63,17 @@ function respond(c: Context, key: string) {
   return c.json(pick.body as never, pick.status as never);
 }
 
-${routes}
+${literalRoutes}
 
 // Static assets first: an endpoint prefix like /hologram can also be a real
 // content directory, and a file that exists must always win over a guard.
 app.use('/*', serveStatic({ root: './dist' }));
+
+// Param routes only now: /:token matches every single-segment path, so it
+// would swallow /favicon.ico and the rest of the mirror if it were registered
+// above. It still has to precede the gap guards below, or /api/* answers 501
+// for an endpoint that was actually captured.
+${patternRoutes}
 
 // Only then: paths under an observed API prefix that were never captured.
 // Answering these with the SPA shell would look like success; 501 says what is

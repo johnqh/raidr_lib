@@ -79,3 +79,57 @@ test('derives the API prefix from the observed endpoints', () => {
   });
   expect(out).toContain("app.all('/v2/*'");
 });
+
+function endpoint(method: string, template: string) {
+  return {
+    key: `${method} ${template}`,
+    method,
+    template,
+    calls: 1,
+    auth: 'none' as const,
+    requestSchema: null,
+    responses: [{ status: 200, count: 1, schema: { type: 'unknown' as const } }],
+  };
+}
+
+const MIXED: ApiModel = {
+  baseUrl: null,
+  endpoints: [
+    endpoint('GET', '/{token}'),
+    endpoint('GET', '/gh/user_profile'),
+    endpoint('GET', '/api/users/{id}'),
+  ],
+};
+
+test('a param route never shadows a real mirrored file', () => {
+  const out = generateReplayServer(MIXED);
+  const staticAt = out.indexOf("app.use('/*', serveStatic");
+  const tokenAt = out.indexOf("app.get('/:token'");
+
+  expect(tokenAt).toBeGreaterThan(-1);
+  // `/:token` matches every single-segment path, so registering it ahead of
+  // the static handler swallows /favicon.ico, /index.html and every other
+  // top-level file in the mirror.
+  expect(tokenAt).toBeGreaterThan(staticAt);
+});
+
+test('a literal endpoint route still wins over static', () => {
+  const out = generateReplayServer(MIXED);
+  const staticAt = out.indexOf("app.use('/*', serveStatic");
+  const literalAt = out.indexOf("app.get('/gh/user_profile'");
+
+  expect(literalAt).toBeGreaterThan(-1);
+  // An exact observed path is unambiguous: it must replay its recording.
+  expect(literalAt).toBeLessThan(staticAt);
+});
+
+test('a param route still precedes the gap guard for its own prefix', () => {
+  const out = generateReplayServer(MIXED);
+  const paramAt = out.indexOf("app.get('/api/users/:id'");
+  const guardAt = out.indexOf("app.all('/api/*'");
+
+  expect(paramAt).toBeGreaterThan(-1);
+  expect(guardAt).toBeGreaterThan(-1);
+  // Otherwise /api/* answers 501 for an endpoint that was actually captured.
+  expect(paramAt).toBeLessThan(guardAt);
+});
