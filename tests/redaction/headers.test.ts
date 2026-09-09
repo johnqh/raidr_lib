@@ -47,7 +47,10 @@ test('does not treat a long base64-ish value as a secret on shape alone', () => 
   expect(
     classifyValue('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
   ).toBeNull();
-  // A Firebase web api key, which ships in the bundle.
+  // A publishable frontend api key of the kind that ships inside a bundle.
+  // Deliberately not written in any vendor's real key format: a literal that
+  // looks like a live credential trips secret scanners wherever this file goes,
+  // and the classifier only ever sees length and alphabet anyway.
   expect(classifyValue('publishable-frontend-key-0123456789abcdefghij')).toBeNull();
 });
 
