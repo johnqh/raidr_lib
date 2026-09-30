@@ -1,8 +1,10 @@
 /**
- * Presentation helpers for manifest tools.
+ * Presentation helpers for manifest tools, used by the app's tools table and
+ * by `useMcp` to split read and write tools.
  */
 import type { JsonSchema, McpTool } from '@sudobility/raidr_types';
 
+/** One input of a tool, flattened from its JSON Schema for display. */
 export interface ToolInputField {
   name: string;
   type: string;
@@ -12,6 +14,7 @@ export interface ToolInputField {
   location: 'path' | 'query' | 'header' | 'body';
 }
 
+/** Type label: `string`, `a | b`, `string[]`, an enum's values, or `any`. */
 function schemaType(schema: JsonSchema | undefined): string {
   if (!schema) return 'any';
   const type = schema['type'];
@@ -28,6 +31,11 @@ function schemaType(schema: JsonSchema | undefined): string {
   return 'any';
 }
 
+/**
+ * Inputs of a tool in schema property order. Location is inferred: a name in
+ * the path template is `path`, then a key of `request.query` is `query`, then
+ * a key of `request.headers` is `header`, otherwise `body`.
+ */
 export function toolInputFields(tool: McpTool): ToolInputField[] {
   const required = new Set(tool.inputSchema.required ?? []);
   const pathParams = new Set(
@@ -68,6 +76,11 @@ export function formatToolRequest(tool: McpTool): string {
   return `${tool.request.method} ${tool.request.pathTemplate}`;
 }
 
+/**
+ * True when calling the tool may change upstream state: any non-GET method,
+ * or any tool whose description starts with `mutates:` (case-insensitive),
+ * so a GET with side effects can be flagged in its description.
+ */
 export function isMutatingTool(tool: McpTool): boolean {
   return tool.request.method !== 'GET' || /^mutates:/i.test(tool.description);
 }

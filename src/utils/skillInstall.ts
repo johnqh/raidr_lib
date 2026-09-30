@@ -1,7 +1,9 @@
 /**
- * Install instructions for a published skill.
+ * Install instructions for a published skill. Pure string building; the
+ * SKILL.md itself is served by raidr_api.
  */
 
+/** Inputs for `skillInstallInstructions`. */
 export interface SkillInstallInput {
   apiHost: string;
   /** Skill name from its frontmatter; becomes the directory name. */
@@ -9,6 +11,7 @@ export interface SkillInstallInput {
   apiBaseUrl: string;
 }
 
+/** Copy-ready install commands for one skill. */
 export interface SkillInstallInstructions {
   markdownUrl: string;
   /** Downloads SKILL.md into the personal Claude Code skills directory. */
@@ -19,10 +22,19 @@ export interface SkillInstallInstructions {
   crawlerCommand: string;
 }
 
+/**
+ * Absolute URL of the raw SKILL.md. Duplicates
+ * `RaidrClient.skillMarkdownUrl` so it can be called without a client.
+ */
 export function skillMarkdownUrl(apiBaseUrl: string, apiHost: string): string {
   return `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/skills/${encodeURIComponent(apiHost)}/SKILL.md`;
 }
 
+/**
+ * Install commands for one skill. The skill name becomes the directory name,
+ * with runs of characters outside `[A-Za-z0-9._-]` replaced by `-` so the
+ * path is shell-safe.
+ */
 export function skillInstallInstructions(
   input: SkillInstallInput
 ): SkillInstallInstructions {

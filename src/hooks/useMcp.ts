@@ -1,3 +1,7 @@
+/**
+ * Everything the MCP detail page needs from one hook: the manifest, tools
+ * split by effect, the companion skill and connection snippets.
+ */
 import { useMemo } from 'react';
 import { useRaidrMcp, useRaidrSkill } from '@sudobility/raidr_client';
 import type { Mcp, McpManifest, McpTool, Skill } from '@sudobility/raidr_types';
@@ -9,6 +13,7 @@ import {
 import { isMutatingTool } from '../utils/tools';
 import { detailState } from '../utils/errors';
 
+/** Inputs for `useMcp`. */
 export interface UseMcpOptions {
   networkClient: NetworkClient;
   baseUrl: string;
@@ -17,11 +22,14 @@ export interface UseMcpOptions {
   token?: string;
 }
 
+/** Output of `useMcp`. */
 export interface UseMcpResult {
   mcp: Mcp | null;
   manifest: McpManifest | null;
   tools: McpTool[];
+  /** Tools for which `isMutatingTool` is false. */
   readTools: McpTool[];
+  /** Tools that change upstream state (non-GET or described `mutates:`). */
   writeTools: McpTool[];
   /** The companion skill, when one has been published. */
   skill: Skill | null;
@@ -33,7 +41,13 @@ export interface UseMcpResult {
   error: Error | null;
 }
 
-/** One MCP with its tools split by effect, its skill, and ready-to-copy connection configs. */
+/**
+ * One MCP with its tools split by effect, its skill, and ready-to-copy
+ * connection configs. Both queries run in parallel with `retry: false`, so a
+ * 404 shows as `notFound` at once instead of after three retries. Only the
+ * MCP query drives `isLoading`/`notFound`/`error`; a missing skill just
+ * leaves `skill` null.
+ */
 export function useMcp(options: UseMcpOptions): UseMcpResult {
   const { networkClient, baseUrl, apiHost, token } = options;
   const mcpQuery = useRaidrMcp(networkClient, baseUrl, apiHost, {

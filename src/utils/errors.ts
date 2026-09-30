@@ -11,7 +11,14 @@ export function isNotFoundError(error: unknown): boolean {
   );
 }
 
-/** Classify a detail query: loading, found, missing, or failed. */
+/**
+ * Classify a detail query: loading, found, missing, or failed.
+ *
+ * Order matters: a disabled query (empty route param) is not found; loading
+ * is neither; a 404 error is not found; any other error is returned for the
+ * page's error state; a settled response without `success: true` is not
+ * found. Pages render Loading, then ErrorState, then EmptyState from this.
+ */
 export function detailState(query: {
   isLoading: boolean;
   error: Error | null;

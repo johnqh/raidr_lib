@@ -4,6 +4,12 @@
  * Catalog hooks (search + pagination state), MCP/skill/site detail hooks,
  * connection snippets for MCP clients, and skill install instructions.
  * No UI components.
+ *
+ * Layer: raidr_types -> raidr_client -> raidr_lib -> raidr_app. Hooks read
+ * through raidr_client's hooks (never fetch directly) and take the
+ * NetworkClient and base URL as options, so the app decides where they come
+ * from. This file is the whole public API: anything not exported here is
+ * private.
  */
 
 export { CATALOG_PAGE_SIZE, type CatalogResult } from './hooks/catalog';

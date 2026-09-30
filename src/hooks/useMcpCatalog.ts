@@ -8,6 +8,7 @@ import {
   useCatalogFilter,
 } from './catalog';
 
+/** Inputs for `useMcpCatalog`. */
 export interface UseMcpCatalogOptions {
   networkClient: NetworkClient;
   baseUrl: string;

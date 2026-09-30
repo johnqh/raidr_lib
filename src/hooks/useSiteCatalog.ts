@@ -8,6 +8,7 @@ import {
   useCatalogFilter,
 } from './catalog';
 
+/** Inputs for `useSiteCatalog`. */
 export interface UseSiteCatalogOptions {
   networkClient: NetworkClient;
   baseUrl: string;
@@ -15,6 +16,11 @@ export interface UseSiteCatalogOptions {
   apiHost?: string;
 }
 
+/**
+ * Searchable, paginated list of crawled sites. With `apiHost` set the list is
+ * scoped: search is ignored and the first page is always fetched, but the
+ * result still reports the shared `sites` filter's `search` and `page`.
+ */
 export function useSiteCatalog(
   options: UseSiteCatalogOptions
 ): CatalogResult<Site> {

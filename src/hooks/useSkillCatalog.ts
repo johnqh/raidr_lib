@@ -8,11 +8,13 @@ import {
   useCatalogFilter,
 } from './catalog';
 
+/** Inputs for `useSkillCatalog`. */
 export interface UseSkillCatalogOptions {
   networkClient: NetworkClient;
   baseUrl: string;
 }
 
+/** Searchable, paginated list of published skills; filter kept per session. */
 export function useSkillCatalog(
   options: UseSkillCatalogOptions
 ): CatalogResult<SkillSummary> {
