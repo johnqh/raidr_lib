@@ -1,0 +1,59 @@
+/**
+ * @sudobility/raidr_lib - Business logic for raidr apps
+ *
+ * Catalog hooks (search + pagination state), MCP/skill/site detail hooks,
+ * connection snippets for MCP clients, and skill install instructions.
+ * No UI components.
+ */
+
+export { CATALOG_PAGE_SIZE, type CatalogResult } from './hooks/catalog';
+export {
+  useMcpCatalog,
+  type UseMcpCatalogOptions,
+} from './hooks/useMcpCatalog';
+export {
+  useSkillCatalog,
+  type UseSkillCatalogOptions,
+} from './hooks/useSkillCatalog';
+export {
+  useSiteCatalog,
+  type UseSiteCatalogOptions,
+} from './hooks/useSiteCatalog';
+export { useMcp, type UseMcpOptions, type UseMcpResult } from './hooks/useMcp';
+export {
+  useSkill,
+  type UseSkillOptions,
+  type UseSkillResult,
+} from './hooks/useSkill';
+export {
+  useSite,
+  type UseSiteOptions,
+  type UseSiteResult,
+} from './hooks/useSite';
+
+export {
+  type CatalogFilter,
+  type CatalogKind,
+  useCatalogFilterStore,
+} from './stores/catalogFilterStore';
+
+export {
+  buildConnectConfigs,
+  type ConnectConfigs,
+  type ConnectConfigsInput,
+  mcpServerName,
+  TOKEN_PLACEHOLDER,
+} from './utils/connectConfigs';
+export {
+  type SkillInstallInput,
+  type SkillInstallInstructions,
+  skillInstallInstructions,
+  skillMarkdownUrl,
+} from './utils/skillInstall';
+export {
+  formatToolRequest,
+  formatToolSignature,
+  isMutatingTool,
+  type ToolInputField,
+  toolInputFields,
+} from './utils/tools';
