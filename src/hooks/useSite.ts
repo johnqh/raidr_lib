@@ -1,6 +1,7 @@
 import { useRaidrSite } from '@sudobility/raidr_client';
 import type { Site } from '@sudobility/raidr_types';
 import type { NetworkClient } from '@sudobility/types';
+import { detailState } from '../utils/errors';
 
 export interface UseSiteOptions {
   networkClient: NetworkClient;
@@ -26,11 +27,12 @@ export function useSite(options: UseSiteOptions): UseSiteResult {
     }
   );
   const site = query.data?.data ?? null;
+  const state = detailState({ ...query, enabled: options.origin.length > 0 });
   return {
     site,
     apiHosts: site?.api_hosts ?? [],
     isLoading: query.isLoading,
-    notFound: !query.isLoading && !query.data?.success,
-    error: query.error,
+    notFound: state.notFound,
+    error: state.error,
   };
 }

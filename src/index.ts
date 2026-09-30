@@ -50,6 +50,7 @@ export {
   skillInstallInstructions,
   skillMarkdownUrl,
 } from './utils/skillInstall';
+export { detailState, isNotFoundError } from './utils/errors';
 export {
   formatToolRequest,
   formatToolSignature,

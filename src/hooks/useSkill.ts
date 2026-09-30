@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useRaidrMcp, useRaidrSkill } from '@sudobility/raidr_client';
 import type { Skill } from '@sudobility/raidr_types';
 import type { NetworkClient } from '@sudobility/types';
+import { detailState } from '../utils/errors';
 import {
   skillInstallInstructions,
   type SkillInstallInstructions,
@@ -41,12 +42,13 @@ export function useSkill(options: UseSkillOptions): UseSkillResult {
         : null,
     [skill, apiHost, baseUrl]
   );
+  const state = detailState({ ...skillQuery, enabled: apiHost.length > 0 });
   return {
     skill,
     hasMcp: mcpQuery.data?.success === true,
     install,
     isLoading: skillQuery.isLoading,
-    notFound: !skillQuery.isLoading && !skillQuery.data?.success,
-    error: skillQuery.error,
+    notFound: state.notFound,
+    error: state.error,
   };
 }

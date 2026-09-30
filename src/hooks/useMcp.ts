@@ -7,6 +7,7 @@ import {
   type ConnectConfigs,
 } from '../utils/connectConfigs';
 import { isMutatingTool } from '../utils/tools';
+import { detailState } from '../utils/errors';
 
 export interface UseMcpOptions {
   networkClient: NetworkClient;
@@ -26,7 +27,9 @@ export interface UseMcpResult {
   skill: Skill | null;
   connect: ConnectConfigs;
   isLoading: boolean;
+  /** True only when the API answered that no MCP exists for this host. */
   notFound: boolean;
+  /** A failure other than not-found, such as the API being unreachable. */
   error: Error | null;
 }
 
@@ -56,6 +59,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     [apiHost, baseUrl, token]
   );
 
+  const state = detailState({ ...mcpQuery, enabled: apiHost.length > 0 });
   return {
     mcp,
     manifest,
@@ -65,7 +69,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     skill: skillQuery.data?.data ?? null,
     connect,
     isLoading: mcpQuery.isLoading,
-    notFound: !mcpQuery.isLoading && !mcpQuery.data?.success,
-    error: mcpQuery.error,
+    notFound: state.notFound,
+    error: state.error,
   };
 }
