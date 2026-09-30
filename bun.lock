@@ -6,8 +6,8 @@
       "name": "@sudobility/raidr_lib",
       "devDependencies": {
         "@sudobility/di": "^1.5.67",
-        "@sudobility/raidr_client": "^0.1.1",
-        "@sudobility/raidr_types": "^0.1.3",
+        "@sudobility/raidr_client": "^0.1.2",
+        "@sudobility/raidr_types": "^0.1.4",
         "@sudobility/types": "^1.9.68",
         "@tanstack/react-query": "^5.90.11",
         "@testing-library/dom": "^10.4.1",
@@ -31,8 +31,8 @@
       },
       "peerDependencies": {
         "@sudobility/di": "^1.5.67",
-        "@sudobility/raidr_client": "^0.1.1",
-        "@sudobility/raidr_types": "^0.1.3",
+        "@sudobility/raidr_client": "^0.1.2",
+        "@sudobility/raidr_types": "^0.1.4",
         "@sudobility/types": "^1.9.68",
         "@tanstack/react-query": ">=5.0.0",
         "react": ">=18.0.0",
@@ -233,9 +233,9 @@
 
     "@sudobility/di": ["@sudobility/di@1.5.67", "", { "peerDependencies": { "@notifee/react-native": ">=7.0.0", "@react-native-async-storage/async-storage": ">=1.19.0", "@react-native-community/netinfo": ">=9.0.0", "@react-native-firebase/analytics": ">=18.0.0", "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/messaging": ">=18.0.0", "@react-native-firebase/remote-config": ">=18.0.0", "@sudobility/types": "^1.9.68", "firebase": ">=11.0.0", "react": ">=18.0.0", "react-native": ">=0.70.0" }, "optionalPeers": ["@notifee/react-native", "@react-native-async-storage/async-storage", "@react-native-community/netinfo", "@react-native-firebase/analytics", "@react-native-firebase/app", "@react-native-firebase/messaging", "@react-native-firebase/remote-config", "firebase", "react-native"] }, "sha512-7ipJFPYFTdkbDo2i2abBkiejnzFP0cjhYt0Jhaw1S4ucFBiz5A80E4ogZnAj0U+gGcmTXbDxvi43sjvgYMQQ8w=="],
 
-    "@sudobility/raidr_client": ["@sudobility/raidr_client@0.1.1", "", { "dependencies": { "@sudobility/raidr_types": "^0.1.3" }, "peerDependencies": { "@sudobility/di": "^1.5.67", "@sudobility/types": "^1.9.68", "@tanstack/react-query": ">=5.0.0", "react": ">=18.0.0" } }, "sha512-0JcsGhjsxEsF2QdEBlFmGRKGrqxw0bUG4GHa6EzLYNNAWkkcPHLZkQ+UWED9A0P6RZW9p2g/7FYTiTtWDrZl9g=="],
+    "@sudobility/raidr_client": ["@sudobility/raidr_client@0.1.2", "", { "dependencies": { "@sudobility/raidr_types": "^0.1.4" }, "peerDependencies": { "@sudobility/di": "^1.5.67", "@sudobility/types": "^1.9.68", "@tanstack/react-query": ">=5.0.0", "react": ">=18.0.0" } }, "sha512-aO2YZb4NKuZnXhx6XXo0PJbj/pjrkVw2RKSSxX5YEnrnTFwrINEtavb1peQK+Jl2v5Qa17G9amF6XRJ95gFzvg=="],
 
-    "@sudobility/raidr_types": ["@sudobility/raidr_types@0.1.3", "", { "peerDependencies": { "@sudobility/types": "^1.9.68", "zod": "^4.0.0" }, "optionalPeers": ["zod"] }, "sha512-OMxd6PY3ndlO6p6ccdYjQVwC7O6sesxgW+SiZfwm/rhRMZ4p5HvzzR1NmzZEcPcGD1Yc5u19ROgCdQQrvGBuHQ=="],
+    "@sudobility/raidr_types": ["@sudobility/raidr_types@0.1.4", "", { "peerDependencies": { "@sudobility/types": "^1.9.68", "zod": "^4.0.0" }, "optionalPeers": ["zod"] }, "sha512-Z83il3VW3g2YcKS27XLrqquaRRC7pauLEMhrn2ecAtWA4ZKiIsg2jWwol30LkaGeQOT4l2Oris8rESsXWkl0Sw=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.68", "", {}, "sha512-4LL5+UfcqQcc0PKKR/z/PqS6j9DQPVkkjL+3oOW+Bwx0TAu1SVKAlPhlt/9ruNMW+abcHuZoFvbOVD5gdYBSGw=="],
 
