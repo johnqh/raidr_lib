@@ -68,14 +68,14 @@ src/
 │   ├── useMcpCatalog.ts        useRaidrMcps + filter 'mcps'
 │   ├── useSkillCatalog.ts      useRaidrSkills + filter 'skills'
 │   ├── useSiteCatalog.ts       useRaidrSites + filter 'sites'; optional apiHost scope
-│   ├── useMcp.ts               MCP + companion skill + read/write tools + connect snippets
+│   ├── useMcp.ts               public summary; full MCP + tools + connect snippets when signed in
 │   ├── useSkill.ts             skill + install commands + hasMcp
 │   └── useSite.ts              site + apiHosts
 ├── stores/catalogFilterStore.ts zustand persist, sessionStorage key 'raidr-catalog-filters'
 ├── utils/
 │   ├── errors.ts               isNotFoundError, detailState
-│   ├── connectConfigs.ts       buildConnectConfigs, mcpServerName, TOKEN_PLACEHOLDER
-│   ├── skillInstall.ts         skillInstallInstructions, skillMarkdownUrl
+│   ├── connectConfigs.ts       buildConnectConfigs, mcpServerName, shellQuote, API_KEY_/SITE_TOKEN_PLACEHOLDER
+│   ├── skillInstall.ts         skillInstallInstructions (one curl command), skillMarkdownUrl, skillDirectoryName
 │   ├── tools.ts                toolInputFields, formatToolSignature, formatToolRequest, isMutatingTool
 │   └── *.test.ts               tests sit beside the code
 └── test/setup.ts               Vitest setup: stubs localStorage, window listeners, matchMedia
@@ -111,6 +111,13 @@ session, so Back from a detail page restores the list.
 from `@sudobility/types` carries (raidr_client's error path). Pages render
 `Loading` → `ErrorState` → `EmptyState` in that order (see raidr_app).
 
+**Auth.** raidr_lib never handles credentials itself. The caller's
+`networkClient` carries the user's Firebase token (building_blocks'
+`useApi()`), and `useMcp` takes `isAuthenticated` so it only requests the
+gated full manifest when someone is signed in. Signed out it returns the public
+`summary`, `mcp: null` and `requiresSignIn: true`. `notFound` comes from the
+summary query in both states.
+
 **Retry.** `useMcp`, `useSkill` (for its MCP lookup) and `useSite` pass
 `retry: false`; raidr_client's `useRaidrSkill` already defaults to it. A 404 is
 therefore reported immediately. Caching, keys and stale times come from
@@ -119,15 +126,21 @@ raidr_client (`STALE_TIMES`: catalog 5 min, detail 10 min).
 **Derived data.**
 - `useMcp`: `readTools` / `writeTools` split by `isMutatingTool` (non-GET, or a
   description starting `mutates:` case-insensitively); `connect` from
-  `buildConnectConfigs` with the optional user `token`; `skill` is the companion
-  skill or null (it never drives `notFound`).
-- `useSkill`: `install` from `skillInstallInstructions`; `hasMcp` is
-  `mcpQuery.data?.success === true`.
-- `buildConnectConfigs`: URL `mcpProxyUrl(apiBaseUrl, apiHost)`, header
-  `X-Raidr-Token` (`RAIDR_TOKEN_HEADER`), server name `raidr-<host with non
-  [a-z0-9] runs as ->`; snippets for Claude Code (CLI + `.mcp.json`), Claude
-  Desktop (via `npx -y mcp-remote`) and Cursor. The token is only formatted
-  into strings.
+  `buildConnectConfigs` with the optional user `apiKey` and `siteToken`;
+  `skill` is the companion skill or null (it never drives `notFound`).
+- `useSkill`: `install` from `skillInstallInstructions`; `hasMcp` reads the
+  public MCP summary (the full manifest would 401 when signed out).
+- `skillInstallInstructions`: `{ markdownUrl, directory, command }`, where
+  `command` is a single `curl -fsSL … --create-dirs -o ~/.claude/skills/<dir>/SKILL.md`.
+  `skillDirectoryName` refuses `..` and path separators.
+- `buildConnectConfigs`: URL `mcpProxyUrl(apiBaseUrl, apiHost)`; headers
+  `Authorization: Bearer <raidr key>` and, when `needsSiteToken`,
+  `X-Raidr-Token` (`RAIDR_TOKEN_HEADER`); server name `raidr-<host with non
+  [a-z0-9] runs as ->`. Snippets for Claude Code (CLI with `shellQuote`d
+  headers + `.mcp.json`), Claude Desktop (`npx -y mcp-remote`, values passed
+  through env `RAIDR_AUTH` / `RAIDR_SITE_TOKEN` and `Name:${VAR}` args) and
+  Cursor. Empty inputs become `API_KEY_PLACEHOLDER` / `SITE_TOKEN_PLACEHOLDER`.
+  Values are only formatted into strings.
 
 ## How to add a hook, end to end
 

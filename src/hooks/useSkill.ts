@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useRaidrMcp, useRaidrSkill } from '@sudobility/raidr_client';
+import { useRaidrMcpSummary, useRaidrSkill } from '@sudobility/raidr_client';
 import type { Skill } from '@sudobility/raidr_types';
 import type { NetworkClient } from '@sudobility/types';
 import { detailState } from '../utils/errors';
@@ -29,13 +29,13 @@ export interface UseSkillResult {
 
 /**
  * One skill with install commands, plus whether an MCP exists for the same
- * host. The MCP query uses `retry: false` and only feeds `hasMcp`; the skill
+ * host. The MCP query reads the public summary (the full manifest needs auth), uses `retry: false` and only feeds `hasMcp`; the skill
  * query alone drives `isLoading`/`notFound`/`error`.
  */
 export function useSkill(options: UseSkillOptions): UseSkillResult {
   const { networkClient, baseUrl, apiHost } = options;
   const skillQuery = useRaidrSkill(networkClient, baseUrl, apiHost);
-  const mcpQuery = useRaidrMcp(networkClient, baseUrl, apiHost, {
+  const mcpQuery = useRaidrMcpSummary(networkClient, baseUrl, apiHost, {
     retry: false,
   });
   const skill = skillQuery.data?.data ?? null;

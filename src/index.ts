@@ -47,12 +47,15 @@ export {
   buildConnectConfigs,
   type ConnectConfigs,
   type ConnectConfigsInput,
+  API_KEY_PLACEHOLDER,
   mcpServerName,
-  TOKEN_PLACEHOLDER,
+  shellQuote,
+  SITE_TOKEN_PLACEHOLDER,
 } from './utils/connectConfigs';
 export {
   type SkillInstallInput,
   type SkillInstallInstructions,
+  skillDirectoryName,
   skillInstallInstructions,
   skillMarkdownUrl,
 } from './utils/skillInstall';
