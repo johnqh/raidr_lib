@@ -67,3 +67,57 @@ export {
   type ToolInputField,
   toolInputFields,
 } from './utils/tools';
+
+// API playground
+export { toDomainEntry, type DomainEntry } from './utils/domains';
+export {
+  groupEndpoints,
+  type EndpointGroup,
+  type EndpointListItem,
+} from './utils/endpoints';
+export {
+  useDomains,
+  type UseDomainsOptions,
+  type UseDomainsResult,
+} from './hooks/useDomains';
+export {
+  useApiInspector,
+  type UseApiInspectorOptions,
+  type UseApiInspectorResult,
+} from './hooks/useApiInspector';
+export {
+  useEndpointPlayground,
+  type UseEndpointPlaygroundOptions,
+  type UseEndpointPlaygroundResult,
+} from './hooks/useEndpointPlayground';
+export {
+  paramControl,
+  validateParam,
+  coerceParam,
+  paramPlaceholder,
+  buildExecute,
+  type ParamControl,
+  type BuiltExecute,
+} from './utils/params';
+export {
+  createCredentialStore,
+  browserStorage,
+  openLoginWindow,
+  type CredentialStore,
+  type CredentialKind,
+  type KeyValueStorage,
+} from './utils/credentials';
+export {
+  useSkillBySlug,
+  type UseSkillBySlugOptions,
+  type UseSkillBySlugResult,
+} from './hooks/useSkillBySlug';
+export {
+  buildFlowGraph,
+  assignColumns,
+  MAX_FLOW_NODES,
+  LOGIN_NODE_ID,
+  type FlowGraph,
+  type FlowNode,
+  type FlowEdge,
+} from './utils/flow';

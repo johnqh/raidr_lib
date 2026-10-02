@@ -21,21 +21,22 @@ raidr_types → raidr_client → raidr_lib (this repo) → raidr_app
 Hooks that turn raidr_client queries into what a page renders (paged catalogs,
 detail records classified as loading / found / missing / failed), plus pure
 helpers: MCP-client connection snippets, skill install commands, tool
-formatting. No UI components, no styling.
+formatting, and the API playground's form model, remembered credentials and
+flow-map layout. No UI components, no styling.
 
 | Item | Value |
 | --- | --- |
 | npm name | `@sudobility/raidr_lib`, `publishConfig.access: public`, BUSL-1.1 |
-| Version | `0.1.1` |
+| Version | `0.1.6` |
 | Entry point | `.` only (`dist/index.js`); `src/index.ts` is the whole public API |
-| Peer deps | `@sudobility/raidr_client` ^0.1.0, `@sudobility/raidr_types` ^0.1.2, `@sudobility/di`, `@sudobility/types`, `@tanstack/react-query` >=5, `react` >=18, `zustand` >=5 |
-| Consumer | `raidr_app` (dep ^0.1.1) |
+| Peer deps | `@sudobility/raidr_client` ^0.1.4, `@sudobility/raidr_types` ^0.1.6, `@sudobility/di`, `@sudobility/types`, `@tanstack/react-query` >=5, `react` >=18, `zustand` >=5 |
+| Consumer | `raidr_app` (dep ^0.1.6) |
 
 ## Rules
 
 - `src/hooks/`: wrap `raidr_client` hooks; add derived data, never fetch directly.
 - `src/stores/catalogFilterStore.ts`: zustand + sessionStorage for search/page.
-- `src/utils/`: pure functions with tests (`connectConfigs`, `skillInstall`, `tools`, `errors`).
+- `src/utils/`: pure functions with tests (`connectConfigs`, `skillInstall`, `tools`, `errors`, `params`, `credentials`, `flow`).
 - Every hook takes `{ networkClient, baseUrl, ... }` so the app injects its client.
 - Anything a page needs to compute goes here, not in raidr_app components.
 
@@ -51,7 +52,7 @@ Every command below was run on 2026-09-30 after the documentation pass.
 | `bun run quick-check` | lint → typecheck | exit 0 |
 | `bun run lint` | ESLint 9 on `src`; `prettier/prettier` is an error | exit 0 |
 | `bun run typecheck` | `tsc --noEmit` (tsconfig excludes `*.test.ts`) | exit 0 |
-| `bun run test:unit` (= `test:run`) | Vitest 4 once, happy-dom, `src/test/setup.ts` | 4 files, 13 tests pass |
+| `bun run test:unit` (= `test:run`) | Vitest 4 once, happy-dom, `src/test/setup.ts` | 8 files, 35 tests pass (re-run 2026-10-02) |
 | `bun run test:coverage` | v8 → `coverage/` (gitignored) | exit 0, ~40% lines, no threshold |
 | `bun run build` | `tsc -p tsconfig.build.json` → `dist/` (gitignored) | exit 0 |
 | `bun run format:check` | Prettier on `src/**/*.ts` | exit 0 |
@@ -70,13 +71,22 @@ src/
 │   ├── useSiteCatalog.ts       useRaidrSites + filter 'sites'; optional apiHost scope
 │   ├── useMcp.ts               public summary; full MCP + tools + connect snippets when signed in
 │   ├── useSkill.ts             skill + install commands + hasMcp
-│   └── useSite.ts              site + apiHosts
+│   ├── useSite.ts              site + apiHosts
+│   ├── useDomains.ts           useSiteCatalog → DomainEntry[] (domain browser)
+│   ├── useApiInspector.ts      API summary; doc + grouped endpoints + flow graph when signed in; hasMcp, skillSlug
+│   ├── useEndpointPlayground.ts one endpoint from an endpointRef: form values/errors, credentials, execute
+│   └── useSkillBySlug.ts       slug → api_host (useRaidrSkillByName) → useSkill
 ├── stores/catalogFilterStore.ts zustand persist, sessionStorage key 'raidr-catalog-filters'
 ├── utils/
 │   ├── errors.ts               isNotFoundError, detailState
 │   ├── connectConfigs.ts       buildConnectConfigs, mcpServerName, shellQuote, API_KEY_/SITE_TOKEN_PLACEHOLDER
 │   ├── skillInstall.ts         skillInstallInstructions (one curl command), skillMarkdownUrl, skillDirectoryName
 │   ├── tools.ts                toolInputFields, formatToolSignature, formatToolRequest, isMutatingTool
+│   ├── params.ts               paramControl, validateParam, coerceParam, paramPlaceholder, buildExecute
+│   ├── credentials.ts          createCredentialStore, browserStorage, openLoginWindow
+│   ├── endpoints.ts            groupEndpoints (by tag, 'other' last; each with its endpointRef)
+│   ├── domains.ts              toDomainEntry (hostname without www., sorted apiHosts)
+│   ├── flow.ts                 buildFlowGraph, assignColumns, MAX_FLOW_NODES (60), LOGIN_NODE_ID
 │   └── *.test.ts               tests sit beside the code
 └── test/setup.ts               Vitest setup: stubs localStorage, window listeners, matchMedia
 ```
@@ -118,6 +128,18 @@ gated full manifest when someone is signed in. Signed out it returns the public
 `summary`, `mcp: null` and `requiresSignIn: true`. `notFound` comes from the
 summary query in both states.
 
+The API playground is the exception: `useEndpointPlayground` keeps the
+*upstream* site's credentials (a user token and an application key), not
+raidr's. `credentials.ts` stores them in `localStorage` per API host under
+`raidr:credential:{kind}:{apiHost}` (`kind` = `user` | `api_key`) while
+`remember` is on (the default); turning it off clears them. With no usable
+storage the store remembers nothing and never throws. `openLoginWindow` opens
+`doc.auth.user.loginUrl` (else the first `siteOrigins`) in a
+`popup,width=520,height=760` window named `raidr-login`; it returns null when
+blocked. The credentials leave the browser only inside an execute request.
+`useApiInspector` and `useEndpointPlayground` take `isAuthenticated` and only
+request the gated doc and flow when signed in.
+
 **Retry.** `useMcp`, `useSkill` (for its MCP lookup) and `useSite` pass
 `retry: false`; raidr_client's `useRaidrSkill` already defaults to it. A 404 is
 therefore reported immediately. Caching, keys and stale times come from
@@ -141,6 +163,27 @@ raidr_client (`STALE_TIMES`: catalog 5 min, detail 10 min).
   through env `RAIDR_AUTH` / `RAIDR_SITE_TOKEN` and `Name:${VAR}` args) and
   Cursor. Empty inputs become `API_KEY_PLACEHOLDER` / `SITE_TOKEN_PLACEHOLDER`.
   Values are only formatted into strings.
+- `params.ts`: form values are always strings; `''` means "not sent".
+  `paramControl` → `text` (input type from `format`), `number`, `select`
+  (`allowOther` when `enumExhaustive === false`), `switch`, `list`
+  (comma-separated scalars) or `json` (objects, arrays of objects).
+  `validateParam` checks required, enum membership, JSON shape, integer/number
+  with min/max, uuid/email/uri/date/date-time, length and `pattern` (a bad
+  pattern never blocks). `buildExecute` validates the whole form, parses the
+  `additionalBody` JSON editor, and attaches only the credential the
+  endpoint's `auth` needs.
+- `useEndpointPlayground`: errors are computed for every field; show them for
+  `touched` fields, or all of them once `showAllErrors` is set by an execute
+  attempt. A new endpoint resets the form. `notFound` covers a malformed
+  ref, a missing host and an endpoint absent from the doc.
+- `buildFlowGraph(doc, flow)`: nodes are this host's linked endpoints,
+  `external` endpoints on other hosts, and `login`. When no `auth` link is
+  known, user endpoints with nothing feeding them start from the doc's
+  `role: 'login'` endpoint, or else from a synthetic `LOGIN_NODE_ID` node.
+  Over `MAX_FLOW_NODES` the most connected nodes are kept (login first) and
+  `hidden` counts the rest. `assignColumns` drops cycle-closing edges by DFS
+  and places each node at its longest path from a source; rows are by label
+  within a column.
 
 ## How to add a hook, end to end
 
@@ -157,7 +200,7 @@ raidr_client (`STALE_TIMES`: catalog 5 min, detail 10 min).
 
 - Family release: `raidr_app/scripts/push_all.sh`, order (`path:wait`)
   `raidr_types:60 → raidr_processor:60 → raidr_client:60 → raidr_lib:60 →
-  raidr_crawler:0 → raidr_cli:0 → raidr_extension:0 → raidr_api:0 → raidr_app:0 →
+  raidr_cli:180 → raidr_crawler:0 → raidr_extension:0 → raidr_api:0 → raidr_app:0 →
   raidr_web:0`. After each publish the sourced `push_projects.sh` polls npm for
   the new version (the number is a cap). Never run it unasked.
 - A push to `main` runs `.github/workflows/ci-cd.yml` → johnqh/workflows
