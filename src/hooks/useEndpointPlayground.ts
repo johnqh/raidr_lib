@@ -7,7 +7,7 @@
  * (`showAllErrors`). Credentials are remembered per API host in this browser
  * when `remember` is on (the default).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRaidrApiDoc, useRaidrExecuteApi } from '@sudobility/raidr_client';
 import {
   type ApiDoc,
@@ -21,7 +21,13 @@ import {
   createCredentialStore,
   type CredentialStore,
   openLoginWindow,
+  watchWindowClosed,
 } from '../utils/credentials';
+import {
+  createExtensionBridge,
+  type ExtensionBridge,
+  TokenRequestError,
+} from '../utils/extensionBridge';
 
 export interface UseEndpointPlaygroundOptions {
   networkClient: NetworkClient;
@@ -31,7 +37,17 @@ export interface UseEndpointPlaygroundOptions {
   isAuthenticated: boolean;
   /** Injected in tests; defaults to localStorage. */
   credentialStore?: CredentialStore;
+  /** Injected in tests; defaults to the page's window. */
+  extensionBridge?: ExtensionBridge;
 }
+
+/**
+ * The sign-in round trip. With the raidr extension: `open` while its window
+ * is up, then `captured` with the token filled in, or `closed` when the user
+ * closed it before signing in. Without it: `open`, then `closed` (time to
+ * paste the token by hand). `idle` before, and once a token is entered.
+ */
+export type LoginWindowState = 'idle' | 'open' | 'closed' | 'captured';
 
 export interface UseEndpointPlaygroundResult {
   apiHost: string | null;
@@ -57,6 +73,15 @@ export interface UseEndpointPlaygroundResult {
   setRemember: (on: boolean) => void;
   /** Open the site's sign-in page in a popup; false when no login URL or the popup was blocked. */
   openLogin: () => boolean;
+  /** See {@link LoginWindowState}. */
+  loginWindow: LoginWindowState;
+  /** Whether the raidr extension answered: it signs in and fills the token itself. */
+  extension: 'checking' | 'available' | 'missing';
+  /**
+   * For a `captured` token: true when a signed-in-only call succeeded with it,
+   * false when it is only the last one seen before the window closed.
+   */
+  tokenVerified: boolean | null;
   /** The endpoint needs a credential the user has not entered. */
   missingCredential: 'user' | 'api_key' | null;
   execute: () => void;
@@ -106,6 +131,27 @@ export function useEndpointPlayground(
   const [remember, setRemember] = useState(true);
   const [userToken, setUserTokenState] = useState('');
   const [apiKey, setApiKeyState] = useState('');
+  const [loginWindow, setLoginWindow] = useState<LoginWindowState>('idle');
+  const [tokenVerified, setTokenVerified] = useState<boolean | null>(null);
+  const stopWatching = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopWatching.current?.(), []);
+
+  const bridge = useMemo(
+    () => options.extensionBridge ?? createExtensionBridge(),
+    [options.extensionBridge]
+  );
+  const [extension, setExtension] = useState<
+    'checking' | 'available' | 'missing'
+  >('checking');
+  useEffect(() => {
+    let live = true;
+    void bridge.detect().then(version => {
+      if (live) setExtension(version ? 'available' : 'missing');
+    });
+    return () => {
+      live = false;
+    };
+  }, [bridge]);
 
   // Load remembered credentials when the host is known.
   useEffect(() => {
@@ -134,6 +180,9 @@ export function useEndpointPlayground(
   const setUserToken = useCallback(
     (token: string) => {
       setUserTokenState(token);
+      // A pasted token ends the sign-in round trip.
+      if (token) setLoginWindow('idle');
+      setTokenVerified(null);
       if (!apiHost) return;
       if (remember) store.set(apiHost, 'user', token);
       else store.clear(apiHost, 'user');
@@ -204,10 +253,65 @@ export function useEndpointPlayground(
   }, [mutation]);
 
   const loginUrl = doc?.auth.user?.loginUrl ?? doc?.siteOrigins[0] ?? null;
-  const openLogin = useCallback(
-    () => (loginUrl ? openLoginWindow(loginUrl) !== null : false),
-    [loginUrl]
+  const userAuth = doc?.auth.user ?? null;
+  const userPaths = useMemo(
+    () =>
+      (doc?.endpoints ?? []).filter(e => e.auth === 'user').map(e => e.path),
+    [doc]
   );
+
+  /** The plain popup: raidr only sees it close, then the user pastes. */
+  const openPopup = useCallback(() => {
+    const win = loginUrl ? openLoginWindow(loginUrl) : null;
+    if (!win) return false;
+    stopWatching.current?.();
+    setLoginWindow('open');
+    stopWatching.current = watchWindowClosed(win, () => {
+      stopWatching.current = null;
+      setLoginWindow('closed');
+    });
+    return true;
+  }, [loginUrl]);
+
+  const openLogin = useCallback(() => {
+    if (!loginUrl) return false;
+    if (extension !== 'available' || !userAuth || !apiHost) return openPopup();
+    stopWatching.current?.();
+    setLoginWindow('open');
+    const pending = bridge.requestToken({
+      apiHost,
+      loginUrl,
+      auth: userAuth,
+      userPaths,
+    });
+    stopWatching.current = pending.cancel;
+    pending.result
+      .then(credential => {
+        stopWatching.current = null;
+        setUserToken(credential.token);
+        setTokenVerified(credential.verified);
+        setLoginWindow('captured');
+      })
+      .catch((error: unknown) => {
+        stopWatching.current = null;
+        // The extension could not open its window: fall back to the popup.
+        if (error instanceof TokenRequestError && error.reason !== 'closed') {
+          if (!openPopup()) setLoginWindow('closed');
+        } else {
+          setLoginWindow('closed');
+        }
+      });
+    return true;
+  }, [
+    loginUrl,
+    extension,
+    userAuth,
+    apiHost,
+    bridge,
+    userPaths,
+    openPopup,
+    setUserToken,
+  ]);
 
   const docMissing =
     isAuthenticated &&
@@ -243,6 +347,9 @@ export function useEndpointPlayground(
     remember,
     setRemember: setRememberAndApply,
     openLogin,
+    loginWindow,
+    extension,
+    tokenVerified,
     missingCredential,
     execute,
     isExecuting: mutation.isPending,

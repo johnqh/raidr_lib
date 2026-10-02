@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { createCredentialStore, type KeyValueStorage } from './credentials';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  createCredentialStore,
+  type KeyValueStorage,
+  watchWindowClosed,
+} from './credentials';
 
 function memory(): KeyValueStorage & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -42,5 +46,31 @@ describe('createCredentialStore', () => {
     const store = createCredentialStore(blocked);
     expect(() => store.set('h', 'user', 'x')).not.toThrow();
     expect(store.get('h', 'user')).toBeNull();
+  });
+});
+
+describe('watchWindowClosed', () => {
+  it('fires once when the popup closes, and not after stop', () => {
+    vi.useFakeTimers();
+    try {
+      const win = { closed: false };
+      const onClosed = vi.fn();
+      watchWindowClosed(win, onClosed, 100);
+      vi.advanceTimersByTime(300);
+      expect(onClosed).not.toHaveBeenCalled();
+      win.closed = true;
+      vi.advanceTimersByTime(500);
+      expect(onClosed).toHaveBeenCalledTimes(1);
+
+      const other = { closed: false };
+      const never = vi.fn();
+      const stop = watchWindowClosed(other, never, 100);
+      stop();
+      other.closed = true;
+      vi.advanceTimersByTime(500);
+      expect(never).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

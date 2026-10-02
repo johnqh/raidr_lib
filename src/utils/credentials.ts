@@ -80,3 +80,21 @@ export function openLoginWindow(url: string): Window | null {
   if (!open) return null;
   return open(url, 'raidr-login', 'popup,width=520,height=760');
 }
+
+/**
+ * Call `onClosed` once the sign-in popup is closed. The site in it is another
+ * origin, so its cookies and token are out of reach; closing the window is the
+ * one signal raidr can see. Returns a stop function.
+ */
+export function watchWindowClosed(
+  win: Pick<Window, 'closed'>,
+  onClosed: () => void,
+  intervalMs = 500
+): () => void {
+  const timer = globalThis.setInterval(() => {
+    if (!win.closed) return;
+    globalThis.clearInterval(timer);
+    onClosed();
+  }, intervalMs);
+  return () => globalThis.clearInterval(timer);
+}

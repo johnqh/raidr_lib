@@ -14,7 +14,12 @@ import {
 } from '@sudobility/raidr_client';
 import type { ApiDoc, ApiDocSummary } from '@sudobility/raidr_types';
 import { type EndpointGroup, groupEndpoints } from '../utils/endpoints';
-import { buildFlowGraph, type FlowGraph } from '../utils/flow';
+import {
+  buildFlowGraph,
+  EMPTY_FLOW,
+  type FlowGraph,
+  type FlowGraphOptions,
+} from '../utils/flow';
 import type { NetworkClient } from '@sudobility/types';
 import { detailState } from '../utils/errors';
 
@@ -23,6 +28,8 @@ export interface UseApiInspectorOptions {
   baseUrl: string;
   apiHost: string;
   isAuthenticated: boolean;
+  /** Labels and expanded group tiles for the flow map. */
+  flowOptions?: FlowGraphOptions;
 }
 
 export interface UseApiInspectorResult {
@@ -44,7 +51,8 @@ export interface UseApiInspectorResult {
 export function useApiInspector(
   options: UseApiInspectorOptions
 ): UseApiInspectorResult {
-  const { networkClient, baseUrl, apiHost, isAuthenticated } = options;
+  const { networkClient, baseUrl, apiHost, isAuthenticated, flowOptions } =
+    options;
   const summaryQuery = useRaidrApiSummary(networkClient, baseUrl, apiHost, {
     retry: false,
   });
@@ -68,12 +76,22 @@ export function useApiInspector(
   const flowData = flowQuery.data?.success
     ? (flowQuery.data.data ?? null)
     : null;
+  const loginLabel = flowOptions?.loginLabel;
+  const groupLabel = flowOptions?.groupLabel;
+  // A stable key, so a new array with the same groups does not re-layout.
+  const expandedKey = [...(flowOptions?.expandedGroups ?? [])]
+    .sort()
+    .join('\n');
   const flow = useMemo(
     () =>
       doc
-        ? buildFlowGraph(doc, flowData)
-        : { nodes: [], edges: [], hidden: 0, columns: 0 },
-    [doc, flowData]
+        ? buildFlowGraph(doc, flowData, {
+            loginLabel,
+            groupLabel,
+            expandedGroups: expandedKey ? expandedKey.split('\n') : [],
+          })
+        : EMPTY_FLOW,
+    [doc, flowData, loginLabel, groupLabel, expandedKey]
   );
   const state = detailState({ ...summaryQuery, enabled: apiHost.length > 0 });
   return {

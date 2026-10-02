@@ -89,6 +89,7 @@ export {
   useEndpointPlayground,
   type UseEndpointPlaygroundOptions,
   type UseEndpointPlaygroundResult,
+  type LoginWindowState,
 } from './hooks/useEndpointPlayground';
 export {
   paramControl,
@@ -103,6 +104,7 @@ export {
   createCredentialStore,
   browserStorage,
   openLoginWindow,
+  watchWindowClosed,
   type CredentialStore,
   type CredentialKind,
   type KeyValueStorage,
@@ -113,11 +115,25 @@ export {
   type UseSkillBySlugResult,
 } from './hooks/useSkillBySlug';
 export {
+  createExtensionBridge,
+  TokenRequestError,
+  type BridgeWindow,
+  type ExtensionBridge,
+  type TokenFailure,
+} from './utils/extensionBridge';
+export {
   buildFlowGraph,
-  assignColumns,
+  flowPath,
+  findBackEdges,
+  EMPTY_FLOW,
+  FLOW_TILE,
+  GROUP_PREVIEW_ROWS,
+  MIN_GROUP_SIZE,
   MAX_FLOW_NODES,
   LOGIN_NODE_ID,
   type FlowGraph,
+  type FlowGraphOptions,
+  type FlowGroupMember,
   type FlowNode,
   type FlowEdge,
 } from './utils/flow';

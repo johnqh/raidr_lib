@@ -27,16 +27,16 @@ flow-map layout. No UI components, no styling.
 | Item | Value |
 | --- | --- |
 | npm name | `@sudobility/raidr_lib`, `publishConfig.access: public`, BUSL-1.1 |
-| Version | `0.1.6` |
+| Version | `0.1.7` |
 | Entry point | `.` only (`dist/index.js`); `src/index.ts` is the whole public API |
-| Peer deps | `@sudobility/raidr_client` ^0.1.4, `@sudobility/raidr_types` ^0.1.6, `@sudobility/di`, `@sudobility/types`, `@tanstack/react-query` >=5, `react` >=18, `zustand` >=5 |
-| Consumer | `raidr_app` (dep ^0.1.6) |
+| Peer deps | `@sudobility/raidr_client` ^0.1.5, `@sudobility/raidr_types` ^0.1.7, `@sudobility/di`, `@sudobility/types`, `@tanstack/react-query` >=5, `react` >=18, `zustand` >=5 |
+| Consumer | `raidr_app` (dep ^0.1.7) |
 
 ## Rules
 
 - `src/hooks/`: wrap `raidr_client` hooks; add derived data, never fetch directly.
 - `src/stores/catalogFilterStore.ts`: zustand + sessionStorage for search/page.
-- `src/utils/`: pure functions with tests (`connectConfigs`, `skillInstall`, `tools`, `errors`, `params`, `credentials`, `flow`).
+- `src/utils/`: pure functions with tests (`connectConfigs`, `skillInstall`, `tools`, `errors`, `params`, `credentials`, `extensionBridge`, `flow`).
 - Every hook takes `{ networkClient, baseUrl, ... }` so the app injects its client.
 - Anything a page needs to compute goes here, not in raidr_app components.
 
@@ -52,7 +52,7 @@ Every command below was run on 2026-09-30 after the documentation pass.
 | `bun run quick-check` | lint → typecheck | exit 0 |
 | `bun run lint` | ESLint 9 on `src`; `prettier/prettier` is an error | exit 0 |
 | `bun run typecheck` | `tsc --noEmit` (tsconfig excludes `*.test.ts`) | exit 0 |
-| `bun run test:unit` (= `test:run`) | Vitest 4 once, happy-dom, `src/test/setup.ts` | 8 files, 35 tests pass (re-run 2026-10-02) |
+| `bun run test:unit` (= `test:run`) | Vitest 4 once, happy-dom, `src/test/setup.ts` | 9 files, 44 tests pass (re-run 2026-10-02) |
 | `bun run test:coverage` | v8 → `coverage/` (gitignored) | exit 0, ~40% lines, no threshold |
 | `bun run build` | `tsc -p tsconfig.build.json` → `dist/` (gitignored) | exit 0 |
 | `bun run format:check` | Prettier on `src/**/*.ts` | exit 0 |
@@ -83,10 +83,11 @@ src/
 │   ├── skillInstall.ts         skillInstallInstructions (one curl command), skillMarkdownUrl, skillDirectoryName
 │   ├── tools.ts                toolInputFields, formatToolSignature, formatToolRequest, isMutatingTool
 │   ├── params.ts               paramControl, validateParam, coerceParam, paramPlaceholder, buildExecute
-│   ├── credentials.ts          createCredentialStore, browserStorage, openLoginWindow
+│   ├── credentials.ts          createCredentialStore, browserStorage, openLoginWindow, watchWindowClosed
+│   ├── extensionBridge.ts      createExtensionBridge (detect, requestToken), TokenRequestError
 │   ├── endpoints.ts            groupEndpoints (by tag, 'other' last; each with its endpointRef)
 │   ├── domains.ts              toDomainEntry (hostname without www., sorted apiHosts)
-│   ├── flow.ts                 buildFlowGraph, assignColumns, MAX_FLOW_NODES (60), LOGIN_NODE_ID
+│   ├── flow.ts                 buildFlowGraph (fan-out groups + dagre layout), flowPath, findBackEdges, FLOW_TILE, MAX_FLOW_NODES (60)
 │   └── *.test.ts               tests sit beside the code
 └── test/setup.ts               Vitest setup: stubs localStorage, window listeners, matchMedia
 ```
@@ -176,14 +177,51 @@ raidr_client (`STALE_TIMES`: catalog 5 min, detail 10 min).
   `touched` fields, or all of them once `showAllErrors` is set by an execute
   attempt. A new endpoint resets the form. `notFound` covers a malformed
   ref, a missing host and an endpoint absent from the doc.
+- `watchWindowClosed(win, onClosed)` polls `win.closed` (500 ms) and fires
+  once; the plain-popup path of `openLogin` uses it to drive `loginWindow`.
+  A cross-origin popup exposes nothing else.
+- `createExtensionBridge(win)` is raidr.app's side of the raidr extension
+  bridge (protocol in raidr_types): it posts `BridgeRequest`s to the page's
+  own window (`win.location.origin`) and listens for `BridgeResponse`s with
+  the same `id`. `detect(timeoutMs = 500)` pings and resolves the extension
+  version, or null on timeout or with no window. `requestToken(request,
+  { onOpened })` returns `{ result, cancel }`: `result` resolves the
+  `CapturedCredential` on `token/result` and rejects with
+  `TokenRequestError(reason)` (`closed | blocked | error`) on `token/failed`;
+  `cancel` stops listening and posts `token/cancel`.
+- `useEndpointPlayground` sign-in: `extension` is `checking` until
+  `bridge.detect()` settles, then `available` or `missing` (inject
+  `extensionBridge` in tests). `openLogin` (false when there is no login URL)
+  goes through the extension when it is `available` and the doc has
+  `auth.user`: it sends `{ apiHost, loginUrl, auth: doc.auth.user, userPaths }`
+  (`userPaths` = every `auth: 'user'` endpoint path), and on success fills the
+  user token (remembered as usual), sets `tokenVerified` from the credential
+  and `loginWindow` to `captured`. A `closed` failure sets `closed`; any other
+  failure (the extension could not open a window) falls back to the plain
+  popup. Without the extension it opens the plain popup (`openLoginWindow`);
+  `loginWindow` (`LoginWindowState`) is `open` until the popup closes, then
+  `closed`. Entering a token by hand sets it back to `idle` and
+  `tokenVerified` to null. Unmount or a new `openLogin` cancels the pending
+  request or stops the popup watch.
 - `buildFlowGraph(doc, flow)`: nodes are this host's linked endpoints,
   `external` endpoints on other hosts, and `login`. When no `auth` link is
   known, user endpoints with nothing feeding them start from the doc's
   `role: 'login'` endpoint, or else from a synthetic `LOGIN_NODE_ID` node.
-  Over `MAX_FLOW_NODES` the most connected nodes are kept (login first) and
-  `hidden` counts the rest. `assignColumns` drops cycle-closing edges by DFS
-  and places each node at its longest path from a source; rows are by label
-  within a column.
+  Fan-out is grouped: edges from one source with the same kind and param into
+  `MIN_GROUP_SIZE` (3) or more leaf endpoints (no outgoing edges, fed only by
+  that source) become one `group` node (`members`, `group:{source}|…` id) and
+  one edge with `count`. Over `MAX_FLOW_NODES` the most connected nodes are
+  kept (login first; a group counts as one) and `hidden` counts the rest.
+  `findBackEdges` marks cycle-closing edges (`back: true`, kept but ignored by
+  the layout). Layout is `@dagrejs/dagre` (LR, network-simplex, sizes from
+  `FLOW_TILE`; a group's height follows its rows, all of them when its id is
+  in `options.expandedGroups`); every node gets `x/y/width/height` and the
+  graph its total `width/height`. Inputs are sorted first, so the same doc
+  always lays out the same. `flowPath(graph, id)` returns the upstream and
+  downstream nodes and edges to light when a tile is focused.
+- `@dagrejs/dagre` is this package's only runtime `dependency` (everything
+  else is a peer). While raidr_lib is synced into raidr_app by hand, copy
+  `node_modules/@dagrejs/{dagre,graphlib}` across too.
 
 ## How to add a hook, end to end
 
