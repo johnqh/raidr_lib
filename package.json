@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/raidr_lib",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Business logic for raidr apps: catalog hooks, MCP connection docs, skill install helpers",
   "type": "module",
   "main": "dist/index.js",

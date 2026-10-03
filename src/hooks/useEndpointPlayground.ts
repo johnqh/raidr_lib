@@ -10,13 +10,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRaidrApiDoc, useRaidrExecuteApi } from '@sudobility/raidr_client';
 import {
+  type AnyApiEndpoint,
   type ApiDoc,
-  type ApiEndpoint,
   type ApiExecuteResult,
   parseEndpointRef,
 } from '@sudobility/raidr_types';
 import type { NetworkClient } from '@sudobility/types';
 import { buildExecute, validateParam } from '../utils/params';
+import { formOf, type PlaygroundForm } from '../utils/schemaForm';
 import {
   createCredentialStore,
   type CredentialStore,
@@ -52,11 +53,14 @@ export type LoginWindowState = 'idle' | 'open' | 'closed' | 'captured';
 export interface UseEndpointPlaygroundResult {
   apiHost: string | null;
   doc: ApiDoc | null;
-  endpoint: ApiEndpoint | null;
+  /** The endpoint, in its doc's version (`isApiEndpointV2` tells them apart). */
+  endpoint: AnyApiEndpoint | null;
+  /** The form fields for `endpoint`, and how its raw JSON editor is used. */
+  form: PlaygroundForm | null;
   /** Raw form text by parameter name. */
   values: Record<string, string>;
   setValue: (name: string, raw: string) => void;
-  /** Raw JSON for extra body fields (endpoints with `additionalBody`). */
+  /** Raw JSON: extra body fields, or the whole body (`form.rawBody`). */
   extraBody: string;
   setExtraBody: (text: string) => void;
   /** Errors by parameter name (and `extraBody`), for every field. */
@@ -118,11 +122,12 @@ export function useEndpointPlayground(
   const doc = (docQuery.data?.success ? docQuery.data.data?.doc : null) ?? null;
   const endpoint = useMemo(
     () =>
-      doc?.endpoints.find(
+      (doc?.endpoints as AnyApiEndpoint[] | undefined)?.find(
         e => e.method === parsed?.method && e.path === parsed?.path
       ) ?? null,
     [doc, parsed]
   );
+  const form = useMemo(() => (endpoint ? formOf(endpoint) : null), [endpoint]);
 
   const [values, setValues] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -214,17 +219,16 @@ export function useEndpointPlayground(
   );
 
   const errors = useMemo(() => {
-    if (!endpoint) return {};
+    if (!endpoint || !form) return {};
     const out: Record<string, string> = {};
-    for (const param of endpoint.params) {
+    for (const param of form.params) {
       const error = validateParam(param, values[param.name] ?? '');
       if (error) out[param.name] = error;
     }
-    return {
-      ...out,
-      ...buildExecute({ ...endpoint, params: [] }, {}, extraBody, {}).errors,
-    };
-  }, [endpoint, values, extraBody]);
+    // Only the raw JSON editor's error; the fields were checked above.
+    const raw = buildExecute(endpoint, {}, extraBody, {}).errors.extraBody;
+    return raw ? { ...out, extraBody: raw } : out;
+  }, [endpoint, form, values, extraBody]);
 
   const missingCredential =
     endpoint?.auth === 'user' && !userToken
@@ -256,7 +260,9 @@ export function useEndpointPlayground(
   const userAuth = doc?.auth.user ?? null;
   const userPaths = useMemo(
     () =>
-      (doc?.endpoints ?? []).filter(e => e.auth === 'user').map(e => e.path),
+      ((doc?.endpoints ?? []) as AnyApiEndpoint[])
+        .filter(e => e.auth === 'user')
+        .map(e => e.path),
     [doc]
   );
 
@@ -333,6 +339,7 @@ export function useEndpointPlayground(
     apiHost: parsed?.apiHost ?? null,
     doc,
     endpoint,
+    form,
     values,
     setValue,
     extraBody,

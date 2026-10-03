@@ -1,12 +1,13 @@
 /** Grouping an API doc's endpoints for the inspector list. Pure. */
 import {
+  type AnyApiEndpoint,
   type ApiDoc,
-  type ApiEndpoint,
   endpointRef,
 } from '@sudobility/raidr_types';
 
 export interface EndpointListItem {
-  endpoint: ApiEndpoint;
+  /** Either doc version's endpoint; both have method, path, summary, auth and tag. */
+  endpoint: AnyApiEndpoint;
   /** `METHOD https://host/path`; the playground link's `endpoint` parameter. */
   ref: string;
 }
@@ -19,7 +20,7 @@ export interface EndpointGroup {
 /** Endpoints grouped by tag (untagged last), in doc order within a group. */
 export function groupEndpoints(doc: ApiDoc): EndpointGroup[] {
   const groups = new Map<string, EndpointListItem[]>();
-  for (const endpoint of doc.endpoints) {
+  for (const endpoint of doc.endpoints as AnyApiEndpoint[]) {
     const tag = endpoint.tag ?? 'other';
     const list = groups.get(tag) ?? [];
     list.push({ endpoint, ref: endpointRef(doc.baseUrl, endpoint) });

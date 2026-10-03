@@ -101,6 +101,12 @@ export {
   type BuiltExecute,
 } from './utils/params';
 export {
+  formOf,
+  schemaToParam,
+  type PlaygroundForm,
+  type RawBodyMode,
+} from './utils/schemaForm';
+export {
   createCredentialStore,
   browserStorage,
   openLoginWindow,

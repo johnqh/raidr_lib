@@ -7,11 +7,15 @@
  * `'true'`/`'false'`/`''`; arrays of scalars are comma-separated; objects and
  * arrays of objects are JSON text. An empty string means "not sent".
  */
-import type {
-  ApiEndpoint,
-  ApiExecuteRequest,
-  ApiParam,
+import {
+  type AnyApiEndpoint,
+  type ApiEndpointV2,
+  type ApiExecuteInput,
+  type ApiExecuteRequest,
+  type ApiParam,
+  isApiEndpointV2,
 } from '@sudobility/raidr_types';
+import { formOf } from './schemaForm';
 
 /**
  * Control for a parameter:
@@ -230,14 +234,18 @@ export interface BuiltExecute {
 
 /**
  * Validate the whole form and build the execute request. `extraBodyText` is
- * the raw JSON editor for endpoints with `additionalBody`.
+ * the raw JSON editor: extra body fields for a version-1 endpoint with
+ * `additionalBody` (or a version-2 object body), the whole body for a
+ * version-2 body that is not an object (see `formOf`).
  */
 export function buildExecute(
-  endpoint: ApiEndpoint,
+  endpoint: AnyApiEndpoint,
   values: Record<string, string>,
   extraBodyText: string,
   credentials: { userToken?: string; apiKey?: string }
 ): BuiltExecute {
+  if (isApiEndpointV2(endpoint))
+    return buildExecuteV2(endpoint, values, extraBodyText, credentials);
   const errors: Record<string, string> = {};
   const params: Record<string, unknown> = {};
   for (const param of endpoint.params) {
@@ -273,6 +281,73 @@ export function buildExecute(
       ...(endpoint.auth === 'api_key' && credentials.apiKey
         ? { apiKey: credentials.apiKey }
         : {}),
+    },
+    errors,
+  };
+}
+
+/** The credential a request carries, for the endpoint's auth. */
+function credentialFields(
+  auth: AnyApiEndpoint['auth'],
+  credentials: { userToken?: string; apiKey?: string }
+): Pick<ApiExecuteRequest, 'userToken' | 'apiKey'> {
+  return {
+    ...(auth === 'user' && credentials.userToken
+      ? { userToken: credentials.userToken }
+      : {}),
+    ...(auth === 'api_key' && credentials.apiKey
+      ? { apiKey: credentials.apiKey }
+      : {}),
+  };
+}
+
+/** `buildExecute` for a version-2 endpoint: values grouped as `input`. */
+function buildExecuteV2(
+  endpoint: ApiEndpointV2,
+  values: Record<string, string>,
+  rawBodyText: string,
+  credentials: { userToken?: string; apiKey?: string }
+): BuiltExecute {
+  const form = formOf(endpoint);
+  const errors: Record<string, string> = {};
+  const input: ApiExecuteInput = {};
+  const fields: Record<string, unknown> = {};
+  for (const param of form.params) {
+    const raw = values[param.name] ?? '';
+    const error = validateParam(param, raw);
+    if (error) {
+      errors[param.name] = error;
+      continue;
+    }
+    const value = coerceParam(param, raw);
+    if (value === undefined) continue;
+    if (param.in === 'path') (input.path ??= {})[param.name] = value;
+    else if (param.in === 'query') (input.query ??= {})[param.name] = value;
+    else if (param.in === 'header')
+      (input.headers ??= {})[param.name] =
+        typeof value === 'string' ? value : JSON.stringify(value);
+    else fields[param.name] = value;
+  }
+  let body: unknown = Object.keys(fields).length > 0 ? fields : undefined;
+  if (form.rawBody !== 'none' && rawBodyText.trim() !== '') {
+    try {
+      const parsed = JSON.parse(rawBodyText) as unknown;
+      if (form.rawBody === 'whole') body = parsed;
+      else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+        body = { ...(parsed as Record<string, unknown>), ...fields };
+      else errors.extraBody = 'Enter a JSON object ({ … })';
+    } catch {
+      errors.extraBody = 'Enter valid JSON';
+    }
+  }
+  if (body !== undefined) input.body = body;
+  if (Object.keys(errors).length > 0) return { request: null, errors };
+  return {
+    request: {
+      endpointId: endpoint.id,
+      params: {},
+      input,
+      ...credentialFields(endpoint.auth, credentials),
     },
     errors,
   };
