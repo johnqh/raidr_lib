@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/raidr_lib",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Business logic for raidr apps: catalog hooks, MCP connection docs, skill install helpers",
   "type": "module",
   "main": "dist/index.js",
@@ -46,8 +46,8 @@
   "license": "BUSL-1.1",
   "devDependencies": {
     "@sudobility/di": "^1.5.68",
-    "@sudobility/raidr_client": "^0.1.8",
-    "@sudobility/raidr_types": "^0.1.10",
+    "@sudobility/raidr_client": "^0.1.9",
+    "@sudobility/raidr_types": "^0.1.11",
     "@sudobility/types": "^1.9.68",
     "@tanstack/react-query": "^5.90.11",
     "@testing-library/dom": "^10.4.1",
